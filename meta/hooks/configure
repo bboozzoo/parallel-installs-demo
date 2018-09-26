@@ -9,7 +9,7 @@ fi
 
 echo "listen port: $port"
 
-echo "port = $port" > "$SNAP_DATA/config"
+echo "port = $port" > "$SNAP_COMMON/config"
 
 # make sure to restart services of this instance
 snapctl restart "$SNAP_INSTANCE_NAME"
