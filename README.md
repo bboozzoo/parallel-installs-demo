@@ -74,14 +74,14 @@ new port.
 The non keyed instance:
 
 ```
-$ curl http://localhost:9991/hello
+$ curl http://localhost:9991/hello.txt
 Hello world!
 ```
 
 The `foo` instance:
 
 ```
-$ curl http://localhost:9992/hello
+$ curl http://localhost:9992/hello.txt
 Hello world from instance "foo"!
 ```
 

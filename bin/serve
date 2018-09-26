@@ -14,26 +14,6 @@ DEFAULT_HOST = '127.0.0.1'
 INSTANCE_KEY = os.environ.get('SNAP_INSTANCE_KEY')
 
 
-class HelloWorldServer(http.server.SimpleHTTPRequestHandler):
-
-    def rsp_hello(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/plain')
-        self.end_headers()
-
-        msg = 'Hello world!\n'
-        if INSTANCE_KEY:
-            msg = 'Hello world from instance "{}"!\n'.format(INSTANCE_KEY)
-        self.wfile.write(msg.encode('utf-8'))
-
-    def do_GET(self):
-        if self.path.startswith('/hello'):
-            self.rsp_hello()
-            return
-
-        super().do_GET()
-
-
 # thin wrapper that supports systemd socket activation
 class ActivatedTCPServer(socketserver.TCPServer):
     # man sd_listen_fds(3)
@@ -88,6 +68,20 @@ def load_config(path):
     return config
 
 
+def make_hello(location):
+    hello_path = os.path.join(os.path.abspath(location), 'hello.txt')
+    logging.info('hello path %s', hello_path)
+    if os.path.exists(hello_path):
+        logging.info('hello already present')
+        return
+
+    with open(hello_path, 'w') as outf:
+        msg = 'Hello world!\n'
+        if INSTANCE_KEY:
+            msg = 'Hello world from instance "{}"!\n'.format(INSTANCE_KEY)
+        outf.write(msg)
+
+
 def main(opts):
     config = {}
     if opts.config and os.path.exists(opts.config):
@@ -103,7 +97,9 @@ def main(opts):
         logging.info('changing working directory to %s', new_dir)
         os.chdir(new_dir)
 
-    server = ActivatedTCPServer((host, port), HelloWorldServer)
+    make_hello(os.getcwd())
+
+    server = ActivatedTCPServer((host, port), http.server.SimpleHTTPRequestHandler)
     try:
         server.serve_forever()
     finally:
