@@ -1,0 +1,11 @@
+name: parallel-installs-demo
+version: 0.1
+
+apps:
+  server:
+    command: bin/wrapper
+    daemon: simple
+    plugs: [network-bind]
+
+hooks:
+  configure:

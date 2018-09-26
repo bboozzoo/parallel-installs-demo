@@ -1,0 +1,3 @@
+#!/bin/sh -ex
+
+exec "$SNAP/bin/serve" -c "$SNAP_DATA/config" -w "$SNAP_DATA"

@@ -1,0 +1,132 @@
+#!/usr/bin/python3
+
+import socketserver
+import socket
+import http.server
+import logging
+import os
+import argparse
+
+
+DEFAULT_PORT = 9991
+DEFAULT_HOST = '127.0.0.1'
+
+INSTANCE_KEY = os.environ.get('SNAP_INSTANCE_KEY')
+
+
+class HelloWorldServer(http.server.SimpleHTTPRequestHandler):
+
+    def rsp_hello(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain')
+        self.end_headers()
+
+        msg = 'Hello world!\n'
+        if INSTANCE_KEY:
+            msg = 'Hello world from instance "{}"!\n'.format(INSTANCE_KEY)
+        self.wfile.write(msg.encode('utf-8'))
+
+    def do_GET(self):
+        if self.path.startswith('/hello'):
+            self.rsp_hello()
+            return
+
+        super().do_GET()
+
+
+# thin wrapper that supports systemd socket activation
+class ActivatedTCPServer(socketserver.TCPServer):
+    # man sd_listen_fds(3)
+    _SD_LISTEN_FDS_START = 3
+
+    def _new_bound_socket(self):
+        sock = socket.socket(self.address_family, self.socket_type)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(self.server_address)
+        return sock
+
+    def _systemd_activated_bind(self, listen_fds):
+        if listen_fds > 1:
+            raise RuntimeError('expecting just one file descriptor, got:'
+                               ' {}'.format(listen_fds))
+
+        # expecting just one
+        fd = ActivatedTCPServer._SD_LISTEN_FDS_START
+        logging.info('using fd %d', fd)
+        self.socket = socket.fromfd(fd, self.address_family, self.socket_type)
+
+    def _simple_bind(self):
+        logging.info('no active socket file descriptors, using %s',
+                     self.server_address)
+        self.socket = self._new_bound_socket()
+
+    def server_bind(self):
+        listen_fds = int(os.environ.get('LISTEN_FDS', 0))
+        if listen_fds > 0:
+            self._systemd_activated_bind(listen_fds)
+        else:
+            self._simple_bind()
+
+
+# poor man's 'key = value' config loader
+def load_config(path):
+    config = {}
+    with open(path) as inf:
+        while True:
+            line = inf.readline()
+            if not line:
+                # done
+                break
+            split = line.strip().split(' = ', maxsplit=2)
+            if len(split) != 2:
+                logging.debug('skipping line "%s"', line)
+                continue
+
+        key = split[0].strip()
+        value = split[1].strip()
+        config[key] = value
+    return config
+
+
+def main(opts):
+    config = {}
+    if opts.config and os.path.exists(opts.config):
+        logging.info('loading configuration file %s', opts.config)
+        config = load_config(opts.config)
+
+    host = config.get('host', DEFAULT_HOST)
+    port = int(config.get('port', DEFAULT_PORT))
+    logging.info('listen address %s:%d', host, port)
+
+    if opts.working_dir:
+        new_dir = os.path.abspath(opts.working_dir)
+        logging.info('changing working directory to %s', new_dir)
+        os.chdir(new_dir)
+
+    server = ActivatedTCPServer((host, port), HelloWorldServer)
+    try:
+        server.serve_forever()
+    finally:
+        logging.info('shutting down')
+        server.shutdown()
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='snap parallel install demo')
+    parser.add_argument('-c', '--config', default=None,
+                        help='configuration file path')
+    parser.add_argument('-w', '--working-dir', default=None,
+                        help='working directory')
+
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    level = logging.INFO
+    if os.environ.get('DEBUG'):
+        level = logging.DEBUG
+    logging.basicConfig(level=level)
+
+    parsed = parse_arguments()
+
+    main(parsed)

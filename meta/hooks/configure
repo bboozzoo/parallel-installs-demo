@@ -1,0 +1,15 @@
+#!/bin/sh -ex
+
+port=$(snapctl get port)
+
+if [ -z "$port" ]; then
+    echo "listen port not set"
+    exit 0
+fi
+
+echo "listen port: $port"
+
+echo "port = $port" > "$SNAP_DATA/config"
+
+# make sure to restart services of this instance
+snapctl restart "$SNAP_INSTANCE_NAME"
