@@ -43,6 +43,15 @@ $ snap pack
 built: parallel-installs-demo_0.1_all.snap
 ```
 
+#### Enable parallel instances feature
+
+The parallel installation of snaps is gated by a feature flag and needs to
+enable it explicitly.
+
+```
+$ sudo snap set system experimental.parallel-instances=true
+```
+
 #### Install snap without the instance key
 
 ```
