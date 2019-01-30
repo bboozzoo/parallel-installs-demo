@@ -1,5 +1,7 @@
 #!/bin/sh -ex
 
+echo "$(date) running hook $SNAP_INSTANCE_NAME $0" >> "$SNAP_COMMON/run.log"
+
 port=$(snapctl get port)
 
 if [ -z "$port" ]; then
